@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { PanInfo } from 'framer-motion';
-import { X, Heart, ArrowRight, Info, Lock, Sparkles, Send } from 'lucide-react';
+import { X, Heart, ArrowRight, Info, Lock, Sparkles, Send, Eye, Zap, Crown, BarChart2, ChevronLeft } from 'lucide-react';
 
 // --- 类型定义 ---
 type Persona = {
@@ -13,6 +13,8 @@ type Persona = {
   description: string;
   color: string; // 用于多巴胺配色
   gradient: string; // 高饱和度渐变背景
+  faceTag: string; // 颜值/气质标签
+  mbtiColorGroup: string; // 性格色系
 };
 
 type Message = {
@@ -31,7 +33,9 @@ const PERSONAS: Persona[] = [
     tags: ['慕强', '搞钱', '效率至上'],
     description: '指挥官：天生的领导者，充满魅力和自信。极其理性，有时会显得缺乏共情能力。',
     color: 'from-violet-400 to-fuchsia-400',
-    gradient: 'bg-gradient-to-br from-[#FF0080] to-[#7928CA]'
+    gradient: 'bg-gradient-to-br from-[#FF0080] to-[#7928CA]',
+    faceTag: '清冷禁欲系',
+    mbtiColorGroup: '紫人 (理性/分析)'
   },
   {
     id: '2',
@@ -41,7 +45,9 @@ const PERSONAS: Persona[] = [
     tags: ['emo', '浪漫', '敏感'],
     description: '调停者：真正的理想主义者。内心世界丰富，极其渴望深度的情感连接。',
     color: 'from-emerald-300 to-cyan-400',
-    gradient: 'bg-gradient-to-br from-[#00DFD8] to-[#007CF0]'
+    gradient: 'bg-gradient-to-br from-[#00DFD8] to-[#007CF0]',
+    faceTag: '文艺破碎感',
+    mbtiColorGroup: '绿人 (理想/共情)'
   },
   {
     id: '3',
@@ -51,7 +57,9 @@ const PERSONAS: Persona[] = [
     tags: ['刺激', '社交悍匪', '活在当下'],
     description: '企业家：充满活力和感知力，热爱冒险，是聚会中的绝对焦点。',
     color: 'from-amber-400 to-orange-500',
-    gradient: 'bg-gradient-to-br from-[#FF4D4D] to-[#F9CB28]'
+    gradient: 'bg-gradient-to-br from-[#FF4D4D] to-[#F9CB28]',
+    faceTag: '阳光运动型',
+    mbtiColorGroup: '黄人 (探索/现实)'
   }
 ];
 
@@ -93,7 +101,9 @@ export default function App() {
   };
 
   const handleSwipe = (persona: Persona, liked: boolean) => {
+    // 将卡片移出当前列表，放入已滑动列表
     setCards(prev => prev.filter(c => c.id !== persona.id));
+    setSwipedCards(prev => [...prev, { persona, liked }]);
 
     if (liked) {
       // 匹配成功，直接进入快闪聊天
@@ -103,9 +113,6 @@ export default function App() {
       ]);
       setChatCount(0);
       setPhase('chat');
-    } else if (cards.length <= 1) {
-      // 没卡了
-      setPhase('result');
     }
   };
 
@@ -139,22 +146,35 @@ export default function App() {
   const handleDecision = (decision: 'liked' | 'passed' | 'timeout') => {
     if (currentChatPersona && decision !== 'timeout') {
       setRatings(prev => ({ ...prev, [currentChatPersona.id]: decision }));
-      setSwipedCards(prev => [...prev, { persona: currentChatPersona, liked: decision === 'liked' }]);
+      // 更新 swipedCards 中对应卡片的状态（如果是聊天中途决定的，之前滑动时的状态被覆盖或确认）
+      setSwipedCards(prev => {
+        const index = prev.findIndex(item => item.persona.id === currentChatPersona.id);
+        if (index > -1) {
+          const newArr = [...prev];
+          newArr[index].liked = decision === 'liked';
+          return newArr;
+        }
+        return [...prev, { persona: currentChatPersona, liked: decision === 'liked' }];
+      });
     } else if (currentChatPersona && decision === 'timeout') {
-        // 如果是超时，默认当做 passed 处理，或者你可以自定义逻辑
+        // 如果是超时，默认当做 passed 处理
         setRatings(prev => ({ ...prev, [currentChatPersona.id]: 'passed' }));
-        setSwipedCards(prev => [...prev, { persona: currentChatPersona, liked: false }]);
+        setSwipedCards(prev => {
+          const index = prev.findIndex(item => item.persona.id === currentChatPersona.id);
+          if (index > -1) {
+            const newArr = [...prev];
+            newArr[index].liked = false;
+            return newArr;
+          }
+          return [...prev, { persona: currentChatPersona, liked: false }];
+        });
     }
     setCurrentRevealType(decision);
     setPhase('reveal');
   };
 
   const nextCard = () => {
-    if (cards.length === 0) {
-      setPhase('result');
-    } else {
-      setPhase('swipe'); // 继续划下一张卡
-    }
+    setPhase('swipe'); // 总是可以返回 swipe，如果没有卡片了，swipe 界面会显示“匹配完成”状态
   };
 
   // ================= 渲染视图 =================
@@ -170,13 +190,23 @@ export default function App() {
           <div className="absolute top-[40%] left-[30%] w-[40%] h-[40%] bg-gradient-to-tr from-[#FF4D4D]/20 to-[#F9CB28]/20 rounded-full mix-blend-multiply filter blur-[60px] opacity-60 animate-pulse-glow" style={{ animationDelay: '1s' }}></div>
         </div>
 
-        <div className="absolute top-12 text-gray-800 text-center z-10 glass-dopamine px-8 py-3 rounded-[32px] shadow-sm">
+        <div className="absolute top-12 text-gray-800 text-center z-10 glass-dopamine px-8 py-3 rounded-[32px] shadow-sm flex items-center justify-between w-[90%] max-w-sm">
           <div className="flex items-center gap-2">
             <Sparkles size={18} className="text-[#FF0080]" />
             <h1 className="text-sm font-black tracking-[0.2em] text-transparent bg-clip-text bg-gradient-to-r from-[#FF0080] to-[#FF4D4D] uppercase">
               MBTI Match
             </h1>
           </div>
+          {/* 灵魂报告入口，只要划过卡就能看 */}
+          {_swipedCards.length > 0 && (
+            <button 
+              onClick={() => setPhase('result')}
+              className="flex items-center gap-1.5 bg-gray-900 text-white px-3 py-1.5 rounded-full text-xs font-bold hover:scale-105 transition-transform shadow-md"
+            >
+              <BarChart2 size={14} />
+              报告
+            </button>
+          )}
         </div>
 
         <div className="relative w-full max-w-sm h-[65vh] flex items-center justify-center z-10 mt-12">
@@ -454,40 +484,91 @@ export default function App() {
       {/* 炫彩背景 */}
       <div className="absolute top-[-20%] left-[-10%] w-[70%] h-[70%] bg-gradient-to-br from-[#FF0080]/20 to-[#F9CB28]/20 rounded-full mix-blend-multiply filter blur-[80px] opacity-80 animate-float"></div>
       
-      <div className="bg-white/80 backdrop-blur-2xl p-1 rounded-[40px] max-w-sm w-full shadow-[0_30px_60px_rgba(0,0,0,0.1)] border-[4px] border-white relative z-10">
-        <div className="bg-gradient-to-b from-white to-gray-50/50 p-10 rounded-[36px] text-center text-gray-800 h-full relative overflow-hidden">
+      <div className="bg-white/80 backdrop-blur-2xl p-1 rounded-[40px] max-w-sm w-full shadow-[0_30px_60px_rgba(0,0,0,0.1)] border-[4px] border-white relative z-10 flex flex-col h-[90vh] max-h-[800px]">
+        {/* Header - 允许返回继续划卡 */}
+        <div className="flex justify-between items-center px-6 py-4 absolute top-0 left-0 w-full z-20">
+           <button 
+             onClick={() => setPhase('swipe')}
+             className="w-10 h-10 bg-white/50 backdrop-blur-md rounded-full flex items-center justify-center text-gray-600 hover:bg-white transition-colors shadow-sm"
+           >
+             <ChevronLeft size={20} />
+           </button>
+        </div>
+
+        <div className="bg-gradient-to-b from-white to-gray-50/50 p-6 pt-16 rounded-[36px] text-center text-gray-800 h-full relative overflow-y-auto scrollbar-hide">
           
-          <div className="w-16 h-16 bg-black rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
-             <Sparkles size={28} className="text-white" />
+          <div className="w-14 h-14 bg-gray-900 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+             <Sparkles size={24} className="text-white" />
           </div>
 
-          <h2 className="text-[11px] text-gray-400 font-black tracking-[0.3em] mb-8 uppercase">Your Soul Report</h2>
+          <h2 className="text-[11px] text-gray-400 font-black tracking-[0.3em] mb-6 uppercase">Your Soul Report</h2>
           
-          <div className="space-y-8 relative z-10">
+          {/* 动态计算报告数据 (Mock 展示，实际可根据 _swipedCards 计算) */}
+          <div className="space-y-6 relative z-10 pb-8">
+            {/* 核心结论 */}
             <div>
-              <p className="text-gray-500 font-medium text-[15px] mb-2">你给了极高评价的那个人，其实是：</p>
-              <div className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[#FF0080] to-[#F9CB28] my-4 drop-shadow-sm">
+              <p className="text-gray-500 font-medium text-[14px] mb-1">基于你最近聊过的 {_swipedCards.length} 个人，你的潜意识偏好是：</p>
+              <div className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[#FF0080] to-[#F9CB28] my-2 drop-shadow-sm">
                 ENTJ
               </div>
-              <p className="text-[15px] font-bold text-gray-800 bg-gray-100 inline-block px-4 py-1.5 rounded-full">霸道 · 高效 · 掌控全局</p>
             </div>
 
-            <div className="w-full h-[2px] bg-gradient-to-r from-transparent via-gray-200 to-transparent my-6"></div>
+            {/* 多维度分析卡片 */}
+            <div className="bg-white rounded-[24px] p-5 shadow-sm border border-gray-100 text-left space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full bg-pink-50 flex items-center justify-center shrink-0 mt-0.5">
+                  <Eye size={16} className="text-[#FF0080]" />
+                </div>
+                <div>
+                  <h3 className="text-[13px] font-bold text-gray-400 mb-1">颜值偏好标签</h3>
+                  <p className="text-[15px] font-black text-gray-800">清冷禁欲系 / 智性恋</p>
+                </div>
+              </div>
+              
+              <div className="w-full h-px bg-gray-50"></div>
 
-            <div className="text-left space-y-4 bg-white p-6 rounded-[24px] shadow-sm border border-gray-100">
-              <p className="text-[14px] text-gray-600 leading-relaxed font-medium">
-                🤖 <strong className="text-gray-900 font-black">AI 鉴定结果：</strong><br/><br/>
-                你可能一直以为自己喜欢温柔体贴的人，但在极其真实的快闪对话中，你的身体却诚实地向“慕强”和“直接”妥协了。
-              </p>
-              <div className="p-4 bg-gray-50 rounded-[16px] border border-gray-100 mt-4">
-                <p className="text-[13px] text-gray-500 font-bold mb-1">你的隐藏 MBTI 偏好可能是：</p>
-                <strong className="text-[#FF0080] font-black text-lg">INFP (依赖型)</strong>
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center shrink-0 mt-0.5">
+                  <Crown size={16} className="text-purple-500" />
+                </div>
+                <div>
+                  <h3 className="text-[13px] font-bold text-gray-400 mb-1">灵魂底色匹配</h3>
+                  <p className="text-[15px] font-black text-gray-800">紫人 (极度慕强、慕理智)</p>
+                </div>
+              </div>
+
+              <div className="w-full h-px bg-gray-50"></div>
+
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0 mt-0.5">
+                  <Zap size={16} className="text-blue-500" />
+                </div>
+                <div>
+                  <h3 className="text-[13px] font-bold text-gray-400 mb-1">AI 沟通建议</h3>
+                  <p className="text-[13px] font-medium text-gray-600 leading-relaxed">
+                    未来与人沟通时，你不需要伪装温和。你的身体很诚实，你更吃<span className="text-gray-900 font-bold">“直球对决”</span>和<span className="text-gray-900 font-bold">“带你飞”</span>的强势沟通方式。
+                  </p>
+                </div>
               </div>
             </div>
             
-            <button className="w-full py-5 mt-4 bg-gray-900 rounded-[24px] font-black text-[16px] text-white shadow-xl hover:scale-[1.02] transition-transform">
-              分享我的灵魂鉴定
-            </button>
+            {/* 付费解锁区域 */}
+            <div className="pt-4 border-t border-gray-100/50 mt-4 relative">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gray-100 text-gray-500 text-[10px] font-bold px-3 py-1 rounded-full border border-white">
+                PRO REPORT
+              </div>
+              <p className="text-[13px] text-gray-500 font-medium mb-4">想知道你的<span className="text-[#FF0080] font-bold">雷区</span>和<span className="text-[#00DFD8] font-bold">隐藏副人格</span>吗？</p>
+              
+              <button className="w-full py-4 bg-gray-900 rounded-[24px] font-black text-[15px] text-white shadow-xl hover:scale-[1.02] transition-transform flex justify-center items-center gap-2 group">
+                <Lock size={16} className="text-gray-400 group-hover:text-white transition-colors" />
+                解锁万字深度解析 (¥19.9)
+              </button>
+              
+              <button className="w-full py-3 mt-2 bg-transparent text-gray-400 font-bold text-[13px] hover:text-gray-600 transition-colors">
+                仅保存基础报告分享
+              </button>
+            </div>
+
           </div>
         </div>
       </div>
