@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { PanInfo } from 'framer-motion';
-import { X, Heart, MessageCircle, ArrowRight, Info, Lock, Sparkles, Send } from 'lucide-react';
+import { X, Heart, ArrowRight, Info, Lock, Sparkles, Send } from 'lucide-react';
 
 // --- 类型定义 ---
 type Persona = {
@@ -67,7 +67,8 @@ export default function App() {
   
   // 滑卡状态
   const [cards, setCards] = useState<Persona[]>(PERSONAS);
-  const [swipedCards, setSwipedCards] = useState<{persona: Persona, liked: boolean}[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_swipedCards, setSwipedCards] = useState<{persona: Persona, liked: boolean}[]>([]);
   const [currentChatPersona, setCurrentChatPersona] = useState<Persona | null>(null);
 
   // 聊天状态
@@ -77,11 +78,12 @@ export default function App() {
   const MAX_CHAT_LIMIT = 10;
 
   // 评分状态
-  const [ratings, setRatings] = useState<Record<string, 'liked' | 'passed'>>({});
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_ratings, setRatings] = useState<Record<string, 'liked' | 'passed'>>({});
   const [currentRevealType, setCurrentRevealType] = useState<'liked' | 'passed' | 'timeout' | null>(null);
 
   // --- 滑卡逻辑 ---
-  const handleDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo, persona: Persona) => {
+  const handleDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo, persona: Persona) => {
     const swipeThreshold = 100;
     if (info.offset.x > swipeThreshold) {
       handleSwipe(persona, true); // 右滑匹配
@@ -297,7 +299,7 @@ export default function App() {
           
           {/* Chat Area */}
           <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-32 z-10 scrollbar-hide">
-            {messages.map((msg, idx) => (
+            {messages.map((msg) => (
               <motion.div 
                 initial={{ opacity: 0, y: 15, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
