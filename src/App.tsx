@@ -1,82 +1,17 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { PanInfo } from 'framer-motion';
 import { X, Heart, ArrowRight, Info, Lock, Sparkles, Send, Eye, Zap, Crown, BarChart2, ChevronLeft } from 'lucide-react';
-
-// --- 类型定义 ---
-type Persona = {
-  id: string;
-  mbti: string;
-  avatar: string;
-  signature: string;
-  tags: string[];
-  description: string;
-  color: string; // 用于多巴胺配色
-  gradient: string; // 高饱和度渐变背景
-  faceTag: string; // 颜值/气质标签
-  mbtiColorGroup: string; // 性格色系
-};
-
-type Message = {
-  id: string;
-  sender: 'user' | 'ai';
-  text: string;
-};
-
-// --- Mock 数据 ---
-const PERSONAS: Persona[] = [
-  {
-    id: '1',
-    mbti: 'ENTJ',
-    avatar: 'https://images.unsplash.com/photo-1618077360395-f3068be8e001?w=800&q=80',
-    signature: '别跟我讲感觉，告诉我你的方案。',
-    tags: ['慕强', '搞钱', '效率至上'],
-    description: '指挥官：天生的领导者，充满魅力和自信。极其理性，有时会显得缺乏共情能力。',
-    color: 'from-violet-400 to-fuchsia-400',
-    gradient: 'bg-gradient-to-br from-[#FF0080] to-[#7928CA]',
-    faceTag: '清冷禁欲系',
-    mbtiColorGroup: '紫人 (理性/分析)'
-  },
-  {
-    id: '2',
-    mbti: 'INFP',
-    avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=800&q=80',
-    signature: '今天云朵的形状，好像一只在笑的猫。',
-    tags: ['emo', '浪漫', '敏感'],
-    description: '调停者：真正的理想主义者。内心世界丰富，极其渴望深度的情感连接。',
-    color: 'from-emerald-300 to-cyan-400',
-    gradient: 'bg-gradient-to-br from-[#00DFD8] to-[#007CF0]',
-    faceTag: '文艺破碎感',
-    mbtiColorGroup: '绿人 (理想/共情)'
-  },
-  {
-    id: '3',
-    mbti: 'ESTP',
-    avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=800&q=80',
-    signature: '走啊，去兜风！想那么多干嘛。',
-    tags: ['刺激', '社交悍匪', '活在当下'],
-    description: '企业家：充满活力和感知力，热爱冒险，是聚会中的绝对焦点。',
-    color: 'from-amber-400 to-orange-500',
-    gradient: 'bg-gradient-to-br from-[#FF4D4D] to-[#F9CB28]',
-    faceTag: '阳光运动型',
-    mbtiColorGroup: '黄人 (探索/现实)'
-  }
-];
-
-const QUICK_REPLIES = [
-  "今天好累，不想上班...",
-  "如果明天是世界末日，你想干嘛？",
-  "你相信一见钟情吗？",
-  "我最近遇到了一个很难搞的客户。"
-];
+import { PERSONAS, QUICK_REPLIES } from './personas'
+import { computeReport } from './report'
+import type { Message, Persona, Phase, SwipedCard } from './types'
 
 export default function App() {
-  const [phase, setPhase] = useState<'swipe' | 'chat' | 'reveal' | 'result'>('swipe');
+  const [phase, setPhase] = useState<Phase>('swipe');
   
   // 滑卡状态
   const [cards, setCards] = useState<Persona[]>(PERSONAS);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [_swipedCards, setSwipedCards] = useState<{persona: Persona, liked: boolean}[]>([]);
+  const [swipedCards, setSwipedCards] = useState<SwipedCard[]>([]);
   const [currentChatPersona, setCurrentChatPersona] = useState<Persona | null>(null);
 
   // 聊天状态
@@ -85,10 +20,28 @@ export default function App() {
   const [chatCount, setChatCount] = useState(0);
   const MAX_CHAT_LIMIT = 10;
 
-  // 评分状态
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [_ratings, setRatings] = useState<Record<string, 'liked' | 'passed'>>({});
   const [currentRevealType, setCurrentRevealType] = useState<'liked' | 'passed' | 'timeout' | null>(null);
+  const replyTimerRef = useRef<number | null>(null)
+  const messageSeqRef = useRef(1)
+
+  const nextMessageId = () => String(messageSeqRef.current++)
+
+  const clearReplyTimer = () => {
+    if (replyTimerRef.current !== null) {
+      window.clearTimeout(replyTimerRef.current)
+      replyTimerRef.current = null
+    }
+  }
+
+  useEffect(() => {
+    if (phase !== 'chat') clearReplyTimer()
+  }, [phase])
+
+  useEffect(() => {
+    return () => clearReplyTimer()
+  }, [])
+
+  const report = useMemo(() => computeReport(swipedCards), [swipedCards])
 
   // --- 滑卡逻辑 ---
   const handleDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo, persona: Persona) => {
@@ -121,20 +74,21 @@ export default function App() {
     const messageText = text || inputValue;
     if (!messageText.trim() || chatCount >= MAX_CHAT_LIMIT) return;
 
-    const newUserMsg: Message = { id: Date.now().toString(), sender: 'user', text: messageText };
+    const newUserMsg: Message = { id: nextMessageId(), sender: 'user', text: messageText };
     setMessages(prev => [...prev, newUserMsg]);
     setInputValue('');
     const newChatCount = chatCount + 1;
     setChatCount(newChatCount);
 
     // 模拟极端性格回复
-    setTimeout(() => {
+    clearReplyTimer()
+    replyTimerRef.current = window.setTimeout(() => {
       let aiText = '';
       if (currentChatPersona?.mbti === 'ENTJ') aiText = '直接说重点，你想表达什么？';
       else if (currentChatPersona?.mbti === 'INFP') aiText = '我能感觉到你文字里的情绪...你现在是不是有点紧张？';
       else aiText = '哈哈哈哈有点意思，继续说！';
 
-      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), sender: 'ai', text: aiText }]);
+      setMessages(prev => [...prev, { id: nextMessageId(), sender: 'ai', text: aiText }]);
       
       if (newChatCount >= MAX_CHAT_LIMIT) {
         handleDecision('timeout');
@@ -144,8 +98,8 @@ export default function App() {
 
   // --- 决策与揭晓逻辑 ---
   const handleDecision = (decision: 'liked' | 'passed' | 'timeout') => {
+    clearReplyTimer()
     if (currentChatPersona && decision !== 'timeout') {
-      setRatings(prev => ({ ...prev, [currentChatPersona.id]: decision }));
       // 更新 swipedCards 中对应卡片的状态（如果是聊天中途决定的，之前滑动时的状态被覆盖或确认）
       setSwipedCards(prev => {
         const index = prev.findIndex(item => item.persona.id === currentChatPersona.id);
@@ -158,7 +112,6 @@ export default function App() {
       });
     } else if (currentChatPersona && decision === 'timeout') {
         // 如果是超时，默认当做 passed 处理
-        setRatings(prev => ({ ...prev, [currentChatPersona.id]: 'passed' }));
         setSwipedCards(prev => {
           const index = prev.findIndex(item => item.persona.id === currentChatPersona.id);
           if (index > -1) {
@@ -198,7 +151,7 @@ export default function App() {
             </h1>
           </div>
           {/* 灵魂报告入口，只要划过卡就能看 */}
-          {_swipedCards.length > 0 && (
+          {swipedCards.length > 0 && (
             <button 
               onClick={() => setPhase('result')}
               className="flex items-center gap-1.5 bg-gray-900 text-white px-3 py-1.5 rounded-full text-xs font-bold hover:scale-105 transition-transform shadow-md"
@@ -503,13 +456,14 @@ export default function App() {
 
           <h2 className="text-[11px] text-gray-400 font-black tracking-[0.3em] mb-6 uppercase">Your Soul Report</h2>
           
-          {/* 动态计算报告数据 (Mock 展示，实际可根据 _swipedCards 计算) */}
           <div className="space-y-6 relative z-10 pb-8">
             {/* 核心结论 */}
             <div>
-              <p className="text-gray-500 font-medium text-[14px] mb-1">基于你最近聊过的 {_swipedCards.length} 个人，你的潜意识偏好是：</p>
+              <p className="text-gray-500 font-medium text-[14px] mb-1">
+                基于你最近聊过的 {report.total} 个人（其中心动 {report.liked} 次），你的潜意识偏好是：
+              </p>
               <div className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[#FF0080] to-[#F9CB28] my-2 drop-shadow-sm">
-                ENTJ
+                {report.topMbti?.value ?? '—'}
               </div>
             </div>
 
@@ -521,7 +475,7 @@ export default function App() {
                 </div>
                 <div>
                   <h3 className="text-[13px] font-bold text-gray-400 mb-1">颜值偏好标签</h3>
-                  <p className="text-[15px] font-black text-gray-800">清冷禁欲系 / 智性恋</p>
+                  <p className="text-[15px] font-black text-gray-800">{report.topFaceTag?.value ?? '—'}</p>
                 </div>
               </div>
               
@@ -533,7 +487,7 @@ export default function App() {
                 </div>
                 <div>
                   <h3 className="text-[13px] font-bold text-gray-400 mb-1">灵魂底色匹配</h3>
-                  <p className="text-[15px] font-black text-gray-800">紫人 (极度慕强、慕理智)</p>
+                  <p className="text-[15px] font-black text-gray-800">{report.topColorGroup?.value ?? '—'}</p>
                 </div>
               </div>
 
@@ -546,7 +500,7 @@ export default function App() {
                 <div>
                   <h3 className="text-[13px] font-bold text-gray-400 mb-1">AI 沟通建议</h3>
                   <p className="text-[13px] font-medium text-gray-600 leading-relaxed">
-                    未来与人沟通时，你不需要伪装温和。你的身体很诚实，你更吃<span className="text-gray-900 font-bold">“直球对决”</span>和<span className="text-gray-900 font-bold">“带你飞”</span>的强势沟通方式。
+                    {report.advice}
                   </p>
                 </div>
               </div>
