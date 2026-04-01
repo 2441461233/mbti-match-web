@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { PanInfo } from 'framer-motion';
 import { X, Heart, ArrowRight, Info, Lock, Sparkles, Send, Eye, Zap, Crown, BarChart2, ChevronLeft } from 'lucide-react';
-import { PERSONAS, QUICK_REPLIES } from './personas'
+import { QUICK_REPLIES, loadConfiguredPersonas } from './personas'
 import { computeReport } from './report'
 import type { Message, Persona, Phase, SwipedCard } from './types'
 
@@ -10,7 +10,7 @@ export default function App() {
   const [phase, setPhase] = useState<Phase>('swipe');
   
   // 滑卡状态
-  const [cards, setCards] = useState<Persona[]>(PERSONAS);
+  const [cards, setCards] = useState<Persona[]>(() => loadConfiguredPersonas());
   const [swipedCards, setSwipedCards] = useState<SwipedCard[]>([]);
   const [currentChatPersona, setCurrentChatPersona] = useState<Persona | null>(null);
 

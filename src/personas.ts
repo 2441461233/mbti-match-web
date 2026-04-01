@@ -45,3 +45,17 @@ export const QUICK_REPLIES = [
   '你相信一见钟情吗？',
   '我最近遇到了一个很难搞的客户。',
 ]
+
+export const PERSONAS_STORAGE_KEY = 'mbti-match-personas'
+
+export function loadConfiguredPersonas() {
+  if (typeof window === 'undefined') return PERSONAS
+  const raw = window.localStorage.getItem(PERSONAS_STORAGE_KEY)
+  if (!raw) return PERSONAS
+  try {
+    const parsed = JSON.parse(raw) as Persona[]
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : PERSONAS
+  } catch {
+    return PERSONAS
+  }
+}
