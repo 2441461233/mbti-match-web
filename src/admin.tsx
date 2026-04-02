@@ -103,7 +103,7 @@ export default function AdminApp() {
 
   if (!token) {
     return (
-      <div className="min-h-screen bg-[#f5f5f7] flex items-center justify-center p-6 relative overflow-hidden">
+      <div className="h-screen bg-[#f5f5f7] flex items-center justify-center p-6 relative overflow-y-auto">
         <div className="absolute top-[-20%] left-[-10%] w-[70%] h-[70%] bg-gradient-to-br from-[#FF0080]/20 to-[#F9CB28]/20 rounded-full mix-blend-multiply filter blur-[80px] opacity-80 animate-float"></div>
         <div className="glass-dopamine-heavy w-full max-w-md rounded-[40px] p-8 relative z-10">
           <div className="w-14 h-14 bg-gray-900 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
@@ -140,7 +140,7 @@ export default function AdminApp() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f5f7] p-6 md:p-8">
+    <div className="h-screen overflow-y-auto bg-[#f5f5f7] p-6 md:p-8">
       <div className="max-w-7xl mx-auto">
         <div className="glass-dopamine-heavy rounded-[32px] p-5 md:p-6 flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
